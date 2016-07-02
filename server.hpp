@@ -1,5 +1,3 @@
-// zmq server for kinect skeleton server
-
 #pragma once
 
 #ifndef VRSYS_SKELETON_SERVER
@@ -19,21 +17,33 @@ struct Server {
 		m_socket.bind(address.c_str());
 	}
 	void send(Joint* joints) {
+		// size of 24 4x4-matrices
+		//size_t len = 384 * sizeof(float);
 		size_t len = 16 * sizeof(float);
 		std::array<float, 16> matrix;
 		matrix.fill(0);
-		// initialize identity matrix
-		matrix[0] = 1;
-		matrix[5] = 1;
-		matrix[10] = 1;
-		matrix[15] = 1;
-		// set transformation values
-		matrix[12] = joints[11].Position.X;
-		matrix[13] = joints[11].Position.Y;
-		matrix[14] = joints[11].Position.Z;
+		//for (int i = 0; i < 24; i++) {
+			float temp[16] = { 0 };
+			// initialize identity matrix
+			temp[0] = 1;
+			temp[5] = 1;
+			temp[10] = 1;
+			temp[15] = 1;
+			// set transformation
+			//temp[3] = joints[11].Position.X;
+			//temp[7] = joints[11].Position.Y;
+			//temp[11] = joints[11].Position.Z;
+			temp[12] = joints[11].Position.X;
+			temp[13] = joints[11].Position.Y;
+			temp[14] = joints[11].Position.Z;
+			for (int k = 0; k < 16; k++) {
+				matrix[k] = temp[k];
+			}
+		//}
 		zmq::message_t message(len);
 		memcpy(message.data(), matrix.data(), len);
 		m_socket.send(message);
+		std::cout << ".";
 	}
 	zmq::context_t m_ctx;
 	zmq::socket_t m_socket;

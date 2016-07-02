@@ -1,6 +1,3 @@
-// main source for kinect skeleton server
-// see README.md for more information
-
 // exclude some windows resources
 // otherwise Kinect and ZMQ won't work together
 #ifndef WIN32_LEAN_AND_MEAN
@@ -12,18 +9,16 @@
 #include <iostream>
 #include "server.hpp"
 
-// release interfaces safely
 template<class Interface>
-inline void SafeRelease(Interface *& interface)
+inline void SafeRelease(Interface *& pInterfaceToRelease)
 {
-	if (interface != NULL)
+	if (pInterfaceToRelease != NULL)
 	{
-		interface->Release();
-		interface = NULL;
+		pInterfaceToRelease->Release();
+		pInterfaceToRelease = NULL;
 	}
 }
 
-// write error message and safely close kinect sensor
 void error(IKinectSensor* sensor, std::string message) {
 	std::cerr << "ERROR: " << message << std::endl;
 	sensor->Close();
@@ -32,7 +27,6 @@ void error(IKinectSensor* sensor, std::string message) {
 }
 
 int main() {
-	//initialize the kinect sensor and framereader
 	HRESULT hr;
 	std::cout << "starting Kinect..." << std::endl;
 	IKinectSensor* sensor = NULL;
@@ -59,7 +53,6 @@ int main() {
 	source->Release();
 	source = NULL;
 
-	// start zmq server
 	Server server("tcp://141.54.147.35:7700");
 
 	while (true) {
