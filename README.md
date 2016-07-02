@@ -14,6 +14,6 @@ You may have to change the include- and link-directories in `CMakeLists.txt`
 
 Run `cmake -G "Visual Studio 14 2015 Win64"` to create the Visual Studio project.
 
-Run `msbuild -p:Configuration=Release` to build the program or open the solution file.
+Run `msbuild ZMQSkeletonServer.sln /p:Configuration=Release` to build the program or open the solution file.
 
 In order ro run the application, please copy `libzmq.dll` to the `Release` directory
