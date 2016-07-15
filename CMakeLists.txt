@@ -12,6 +12,8 @@ link_directories("C:/Users/cicu7215/Documents/zmq/libzmq/bin/x64/Release/v140/dy
 add_executable(SkelServer
   main.cpp
   server.hpp
+  message.hpp
+  bbox.hpp
 )
 
 target_link_libraries(SkelServer "Kinect20.lib")

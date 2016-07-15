@@ -7,7 +7,10 @@
 #include <Kinect.h>
 #include <string>
 #include <iostream>
+#include <fstream>
 #include "server.hpp"
+#include "bbox.hpp"
+#include <exception>
 
 template<class Interface>
 inline void SafeRelease(Interface *& pInterfaceToRelease)
@@ -26,13 +29,29 @@ void error(IKinectSensor* sensor, std::string message) {
 	exit(0);
 }
 
-int main() {
+int main(int argc, char** argv) {
+	// init zmq server
+
+	Server server("tcp://141.54.147.35:7700");
+
+	// set bounding box
+	if (argc > 5) {
+		try {
+			server.bbox.set(std::stof(argv[1]), std::stof(argv[3]));
+			server.bbox.set(std::stof(argv[2]), std::stof(argv[4]));
+		} catch(std::exception e) {
+			std::cerr << "ERROR: " << e.what() << std::endl;
+			return 1;
+		}
+	}
+
+	// main program
 	HRESULT hr;
 	std::cout << "starting Kinect..." << std::endl;
 	IKinectSensor* sensor = NULL;
 	hr = GetDefaultKinectSensor(&sensor);
 	if (FAILED(hr))
-		std::cerr << "ERROR: cannot find default Kinect!" << std::endl;
+		error(sensor, "cannot find default kinect");
 
 	hr = sensor->Open();
 	if (SUCCEEDED(hr))
@@ -53,8 +72,6 @@ int main() {
 	source->Release();
 	source = NULL;
 
-	Server server("tcp://141.54.147.35:7700");
-
 	while (true) {
 		IBodyFrame* frame = NULL;
 		hr = reader->AcquireLatestFrame(&frame);
@@ -73,10 +90,8 @@ int main() {
 			body->get_IsTracked(&tracked);
 			if (!tracked)
 				continue;
-			Joint joints[JointType_Count];
-			body->GetJoints(JointType_Count, joints);
-			server.send(joints);
-			break;
+			if(server.send(body))
+				break;
 		}
 		SafeRelease(frame);
 	}
