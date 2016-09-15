@@ -3,7 +3,7 @@ project(ZMQSkeletonServer)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/externals/libzmq/libzmq/include")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/externals/libzmq/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/externals/kinect/v2.0_1409/inc")
 
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/externals/kinect/v2.0_1409/Lib/x64")
