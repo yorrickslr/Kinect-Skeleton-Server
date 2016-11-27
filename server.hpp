@@ -15,8 +15,12 @@ struct Server {
 	{
 		uint32_t hwm = 1;
 		m_socket.setsockopt(ZMQ_SNDHWM, &hwm, sizeof(hwm));
-
-		m_socket.bind(address.c_str());
+		try {
+			m_socket.bind(address.c_str());
+		}
+		catch (std::exception e) {
+			throw std::logic_error("cannot bind server to address");
+		}
 	}
 	bool send(IBody* body) { //Joint* joints) {
 		Joint joints[JointType_Count];

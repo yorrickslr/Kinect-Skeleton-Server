@@ -8,12 +8,14 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 #include "server.hpp"
 #include "bbox.hpp"
 #include <exception>
+#include <ws2tcpip.h>
 
 template<class Interface>
-inline void SafeRelease(Interface *& pInterfaceToRelease)
+inline void SafeRelease(Interface* pInterfaceToRelease)
 {
 	if (pInterfaceToRelease != NULL)
 	{
@@ -30,69 +32,110 @@ void error(IKinectSensor* sensor, std::string message) {
 }
 
 int main(int argc, char** argv) {
-	// init zmq server
+	std::vector<std::string> args;
+	for (int i = 1; i < argc; i++) {
+		args.push_back(argv[i]);
+	}
 
-	Server server("tcp://141.54.147.35:7700");
+	std::string arg_address;
+	try {
+		arg_address = args.at(0);
+	}
+	catch (std::exception e) {
+		std::cerr << "ERROR: cannot find address in arguments!" << std::endl;
+		std::cerr << "       try --help or -h for usage!" << std::endl;
+		return 1;
+	}
 
-	// set bounding box
-	if (argc > 5) {
-		try {
-			server.bbox.set(std::stof(argv[1]), std::stof(argv[3]));
-			server.bbox.set(std::stof(argv[2]), std::stof(argv[4]));
-		} catch(std::exception e) {
-			std::cerr << "ERROR: " << e.what() << std::endl;
-			return 1;
+	auto iter = std::find_if(args.begin(), args.end(), [](auto arg) {return arg == "--help" || arg == "-h"; });
+	bool arg_help = iter != args.end() ? true : false;
+
+	iter = std::find_if(args.begin(), args.end(), [](auto arg) {return arg == "--bbox" || arg == "-b"; });
+	std::vector<float> arg_bbox;
+	if (iter++ != args.end()) {
+		std::cout << "INFORMATION: reading bbox" << std::endl;
+		for (int i; i < 4; i++) {
+			std::cout << "DEBUG: reading bbox property " << i << std::endl;
+			if (++iter != args.end()) {
+				arg_bbox.push_back(std::stof(*iter));
+			}
 		}
 	}
 
-	// main program
-	HRESULT hr;
-	std::cout << "starting Kinect..." << std::endl;
-	IKinectSensor* sensor = NULL;
-	hr = GetDefaultKinectSensor(&sensor);
-	if (FAILED(hr))
-		error(sensor, "cannot find default kinect");
+	if (arg_help) {
+		std::cout << "usage: " << argv[0] << " <ip:port> [-b|--bbox <x> <z> <toX> <toZ>]" << std::endl;
+		std::cout << std::endl;
+		std::cout << "examples:" << std::endl;
+		std::cout << "         " << argv[0] << " 127.0.0.1:7700" << std::endl;
+		std::cout << "         " << argv[0] << " 127.0.0.1:7700 -b -1 -2 1 2" << std::endl;
+		std::cout << "         " << argv[0] << " yourpc:7700 -bbox -1.2 -3.4 5.6 7.8" << std::endl;
+		return 0;
+	}
 
-	hr = sensor->Open();
-	if (SUCCEEDED(hr))
-		std::cout << "Kinect is online!" << std::endl;
-	else
-		error(sensor, "Kinect is offline");
+	try {
+		std::cout << "INFORMATION: binding server to " << arg_address << std::endl;
+		Server server("tcp://" + arg_address);
 
-	IBodyFrameSource* source = NULL;
-	hr = sensor->get_BodyFrameSource(&source);
-	if (FAILED(hr))
-		error(sensor, "cannot get frame source");
-
-	IBodyFrameReader* reader = NULL;
-	hr = source->OpenReader(&reader);
-	if (FAILED(hr))
-		error(sensor, "cannot open frame reader");
-
-	source->Release();
-	source = NULL;
-
-	while (true) {
-		IBodyFrame* frame = NULL;
-		hr = reader->AcquireLatestFrame(&frame);
-		if (FAILED(hr)) {
-			SafeRelease(frame);
-			continue;
+		// set bounding box
+		if (arg_bbox.size() == 4) {
+			std::cout << "INFORMATION: setting bbox" << std::endl;
+			server.bbox.set(arg_bbox.at(0), arg_bbox.at(1));
+			server.bbox.set(arg_bbox.at(2), arg_bbox.at(3));
 		}
 
-		IBody* bodies[BODY_COUNT] = { 0 };
-		hr = frame->GetAndRefreshBodyData(BODY_COUNT, bodies);
+		// main program
+		HRESULT hr;
+		std::cout << "INFORMATION: starting Kinect..." << std::endl;
+		IKinectSensor* sensor = NULL;
+		hr = GetDefaultKinectSensor(&sensor);
 		if (FAILED(hr))
-			error(sensor, "cannot get body data");
+			error(sensor, "cannot find default kinect");
 
-		for (IBody* body : bodies) {
-			BOOLEAN tracked;
-			body->get_IsTracked(&tracked);
-			if (!tracked)
+		hr = sensor->Open();
+		if (SUCCEEDED(hr))
+			std::cout << "INFORMATION: Kinect is online!" << std::endl;
+		else
+			error(sensor, "Kinect is offline");
+
+		IBodyFrameSource* source = NULL;
+		hr = sensor->get_BodyFrameSource(&source);
+		if (FAILED(hr))
+			error(sensor, "cannot get frame source");
+
+		IBodyFrameReader* reader = NULL;
+		hr = source->OpenReader(&reader);
+		if (FAILED(hr))
+			error(sensor, "cannot open frame reader");
+
+		source->Release();
+		source = NULL;
+
+		while (true) {
+			IBodyFrame* frame = NULL;
+			hr = reader->AcquireLatestFrame(&frame);
+			if (FAILED(hr)) {
+				SafeRelease(frame);
 				continue;
-			if(server.send(body))
-				break;
+			}
+
+			IBody* bodies[BODY_COUNT] = { 0 };
+			hr = frame->GetAndRefreshBodyData(BODY_COUNT, bodies);
+			if (FAILED(hr))
+				error(sensor, "cannot get body data");
+
+			for (IBody* body : bodies) {
+				BOOLEAN tracked;
+				body->get_IsTracked(&tracked);
+				if (!tracked)
+					continue;
+				if (server.send(body))
+					break;
+			}
+			SafeRelease(frame);
 		}
-		SafeRelease(frame);
+	}
+	catch (std::exception e) {
+		std::cerr << "ERROR: " << e.what() << std::endl;
+		return 1;
 	}
 }
