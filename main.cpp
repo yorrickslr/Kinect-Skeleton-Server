@@ -48,21 +48,24 @@ int main(int argc, char** argv) {
 	}
 
 	auto iter = std::find_if(args.begin(), args.end(), [](auto arg) {return arg == "--help" || arg == "-h"; });
-	bool arg_help = iter != args.end() ? true : false;
+	bool arg_help_flag = iter != args.end() ? true : false;
 
 	iter = std::find_if(args.begin(), args.end(), [](auto arg) {return arg == "--bbox" || arg == "-b"; });
+	bool arg_bbox_flag = iter != args.end() ? true : false;
 	std::vector<float> arg_bbox;
-	if (iter++ != args.end()) {
+	if (arg_bbox_flag) {
 		std::cout << "INFORMATION: reading bbox" << std::endl;
-		for (int i; i < 4; i++) {
-			std::cout << "DEBUG: reading bbox property " << i << std::endl;
-			if (++iter != args.end()) {
-				arg_bbox.push_back(std::stof(*iter));
-			}
+		while(++iter != args.end()) {
+			arg_bbox.push_back(std::stof(*iter));
+		}
+		if (arg_bbox.size() != 4) {
+			std::cerr << "ERROR: cannot parse bounding box arguments!" << std::endl;
+			std::cerr << "       try --help or -h for usage!" << std::endl;
+			return 1;
 		}
 	}
 
-	if (arg_help) {
+	if (arg_help_flag) {
 		std::cout << "usage: " << argv[0] << " <ip:port> [-b|--bbox <x> <z> <toX> <toZ>]" << std::endl;
 		std::cout << std::endl;
 		std::cout << "examples:" << std::endl;
@@ -77,7 +80,7 @@ int main(int argc, char** argv) {
 		Server server("tcp://" + arg_address);
 
 		// set bounding box
-		if (arg_bbox.size() == 4) {
+		if (arg_bbox_flag) {
 			std::cout << "INFORMATION: setting bbox" << std::endl;
 			server.bbox.set(arg_bbox.at(0), arg_bbox.at(1));
 			server.bbox.set(arg_bbox.at(2), arg_bbox.at(3));
